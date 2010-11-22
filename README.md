@@ -20,7 +20,9 @@ It is half-baked, unsupported and very, very dirty. *Not for production use!*
     ./viking helloworld.vk
 
     #
-    # Compile a Viking source file to a .pyc
+    # Compile a Viking source file to a .pyc,
+    # then run it using Python.
     #
     ./viking --compile helloworld.vk
+    python helloworld.pyc
 
