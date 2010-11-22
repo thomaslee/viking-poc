@@ -14,12 +14,12 @@ _KEYWORDS = []
 def keyword(s):
     _KEYWORDS.append(s)
     return s
-TOK_IMPORT = keyword("import")
+TOK_USE = keyword("use")
 TOK_IF  = keyword("if")
 TOK_ELSE   = keyword("else")
 TOK_TRUE = keyword("true")
 TOK_FALSE = keyword("false")
-TOK_DEF   = keyword("def")
+TOK_FN   = keyword("func")
 TOK_RETURN = keyword("return")
 TOK_NULL   = keyword("null")
 
@@ -111,7 +111,7 @@ class Parser(object):
     def _parse_stmt(self):
         ttype, semval = self._current()
 
-        if ttype == TOK_IMPORT:
+        if ttype == TOK_USE:
             return self._parse_use()
         elif ttype == TOK_IF:
             return self._parse_if()
@@ -126,15 +126,15 @@ class Parser(object):
             else:
                 self._expect(';')
                 return self._make(ast.Expr, value=expr)
-        elif ttype == TOK_DEF:
-            return self._parse_def()
+        elif ttype == TOK_FN:
+            return self._parse_fn()
         elif ttype == TOK_RETURN:
             return self._parse_return()
         else:
             self._error("unexpected token: %s" % ttype)
 
-    def _parse_def(self):
-        self._expect(TOK_DEF)
+    def _parse_fn(self):
+        self._expect(TOK_FN)
         id = self._expect(TOK_IDENT)
         self._expect("(")
         args = []
@@ -222,7 +222,7 @@ class Parser(object):
             self._error("unknown expression type: %s" % ttype)
 
     def _parse_use(self):
-        self._expect(TOK_IMPORT)
+        self._expect(TOK_USE)
 
         id = self._expect(TOK_IDENT)
         aliasn = self._make(ast.alias, name=id)
