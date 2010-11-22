@@ -16,10 +16,12 @@ def keyword(s):
     return s
 TOK_IMPORT = keyword("import")
 TOK_IF  = keyword("if")
+TOK_ELSE   = keyword("else")
 TOK_TRUE = keyword("true")
 TOK_FALSE = keyword("false")
 TOK_DEF   = keyword("def")
 TOK_RETURN = keyword("return")
+TOK_NULL   = keyword("null")
 
 def readwhile(s, i, pred):
     buf = ""
@@ -173,8 +175,18 @@ class Parser(object):
             stmts.append(stmt)
 
         self._expect("}")
+        orelse = []
+        if self._current()[0] == TOK_ELSE:
+            self._expect(TOK_ELSE)
+            if self._current()[0] == TOK_IF:
+                orelse.append(self._parse_if())
+            else:
+                self._expect("{")
+                while self._current()[0] != "}":
+                    orelse.append(self._parse_stmt())
+                self._expect("}")
 
-        return self._make(ast.If, test=expr, body=stmts, orelse=[])
+        return self._make(ast.If, test=expr, body=stmts, orelse=orelse)
 
     def _parse_expr(self):
         ttype, semval = self._current()
@@ -201,6 +213,9 @@ class Parser(object):
         elif ttype == TOK_FALSE:
             self._expect(TOK_FALSE)
             return self._make(ast.Name, id="False", ctx=ast.Load())
+        elif ttype == TOK_NULL:
+            self._expect(TOK_NULL)
+            return self._make(ast.Name, id="None", ctx=ast.Load())
         elif ttype == "[":
             return self._parse_array()
         else:
