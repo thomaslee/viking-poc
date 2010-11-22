@@ -17,12 +17,23 @@ It is half-baked, unsupported and very, very dirty. *Not for production use!*
     #
     # Run a Viking source file
     #
-    ./viking helloworld.vk
+    $ ./viking helloworld.vk
 
     #
     # Compile a Viking source file to a .pyc,
     # then run it using Python.
     #
-    ./viking --compile helloworld.vk
-    python helloworld.pyc
+    $ ./viking --compile helloworld.vk
+    $ python helloworld.pyc
+
+
+    #
+    # Alternatively, you can import compiled
+    # viking programs in Python.
+    #
+    $ python
+    # ... snip
+    >>> import helloworld
+    Hello, World!
+    >>>
 
