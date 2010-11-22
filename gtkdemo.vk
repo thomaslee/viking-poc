@@ -4,9 +4,17 @@ def onquit(arg1, arg2) {
     gtk.main_quit();
 }
 
+def clicked(arg1) {
+    print("Test");
+}
+
 def main() {
     window = gtk.Window();
     window.connect("delete-event", onquit);
+    button = gtk.Button("Hello");
+    button.connect("clicked", clicked);
+    window.add(button);
+
     window.show_all();
 
     gtk.main();
