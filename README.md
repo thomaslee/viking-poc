@@ -26,13 +26,12 @@ It is half-baked, unsupported and very, very dirty. *Not for production use!*
     $ ./viking --compile helloworld.vk
     $ python helloworld.pyc
 
-
     #
     # Alternatively, you can import compiled
     # viking programs in Python.
     #
     $ python
-    # ... snip
+    # ... snip ...
     >>> import helloworld
     Hello, World!
     >>>
