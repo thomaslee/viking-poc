@@ -1,0 +1,295 @@
+#!/usr/bin/python
+
+import ast
+import sys
+import os
+import imp
+import marshal
+from optparse import OptionParser
+
+TOK_IDENT = "<id>"
+TOK_STR   = "<str>"
+TOK_NUM   = "<num>"
+_KEYWORDS = []
+def keyword(s):
+    _KEYWORDS.append(s)
+    return s
+TOK_IMPORT = keyword("import")
+TOK_IF  = keyword("if")
+TOK_TRUE = keyword("true")
+TOK_FALSE = keyword("false")
+TOK_DEF   = keyword("def")
+TOK_RETURN = keyword("return")
+
+def readwhile(s, i, pred):
+    buf = ""
+    while i < len(s) and pred(s[i]):
+        buf += s[i]
+        i += 1
+    return i, buf
+
+def error(s):
+    print >>sys.stderr, s
+    sys.exit(1)
+
+class Scanner(object):
+    def __init__(self):
+        object.__init__(self)
+
+    def scan(self, s):
+        i = 0
+        tokens = []
+        while i < len(s):
+            #
+            # [a-zA-Z_] -> start of an identifier or a keyword
+            #
+            if s[i].isalpha() or s[i] == '_':
+                def isidentchar(c):
+                    return c.isalpha() or c.isdigit() or c == '_'
+                i, sval = readwhile(s, i, isidentchar)
+                if sval in _KEYWORDS:
+                    tokens.append((sval, None))
+                else:
+                    tokens.append((TOK_IDENT, sval))
+            #
+            # [0-9] -> start of a number
+            #
+            elif s[i].isdigit():
+                i, sval = readwhile(s, i, lambda c: c.isdigit())
+                tokens.append((TOK_NUM, sval))
+            #
+            # " -> start of a string
+            #
+            elif s[i] == '"':
+                i += 1
+                i, sval = readwhile(s, i, lambda c: c != '"')
+                i += 1
+                tokens.append((TOK_STR, sval))
+            #
+            # [\(\);,.{}\[\]=] -> special characters
+            #
+            elif s[i] in ('(', ')', ';', ',', '.', '{', '}', '[', ']', '='):
+                tokens.append((s[i], None))
+                i += 1
+            #
+            # [ \t\r\n] -> skip whitespace
+            #
+            elif s[i] in (' ', "\t", "\r", "\n"):
+                i += 1
+            #
+            # # -> comment
+            #
+            elif s[i] == '#':
+                while s[i] != "\n": i += 1
+                i += 1
+            #
+            # Everything else -> error
+            #
+            else:
+                error("unexpected token: %s" % s[i])
+
+        return tuple(tokens)
+
+class Parser(object):
+    def __init__(self):
+        object.__init__(self)
+        self._tokens = None
+        self._offset  = 0
+
+    def parse(self, tokens):
+        self._tokens = tokens
+        mod = ast.Module()
+        mod.body = []
+        while self._offset < len(self._tokens):
+            stmt = self._parse_stmt()
+            mod.body.append(stmt)
+        self._tokens = None
+        return mod
+
+    def _parse_stmt(self):
+        ttype, semval = self._current()
+
+        if ttype == TOK_IMPORT:
+            return self._parse_use()
+        elif ttype == TOK_IF:
+            return self._parse_if()
+        elif ttype == TOK_IDENT:
+            expr = self._parse_expr()
+            if self._current()[0] == '=':
+                self._next()
+                value = self._parse_expr()
+                self._expect(';')
+                expr.ctx = ast.Store()
+                return self._make(ast.Assign, targets=[expr], value=value)
+            else:
+                self._expect(';')
+                return self._make(ast.Expr, value=expr)
+        elif ttype == TOK_DEF:
+            return self._parse_def()
+        elif ttype == TOK_RETURN:
+            return self._parse_return()
+        else:
+            self._error("unexpected token: %s" % ttype)
+
+    def _parse_def(self):
+        self._expect(TOK_DEF)
+        id = self._expect(TOK_IDENT)
+        self._expect("(")
+        args = []
+        while self._current()[0] != ")":
+            arg = self._expect(TOK_IDENT)
+            arg = self._make(ast.Name, id=arg, ctx=ast.Load())
+            args.append(arg)
+            if self._current()[0] == ',': self._next()
+        args = self._make(ast.arguments, args=args, defaults=[])
+        self._expect(")")
+        self._expect("{")
+        stmts = []
+        while self._current()[0] != "}":
+            stmt = self._parse_stmt()
+            stmts.append(stmt)
+        self._expect("}")
+        return self._make(ast.FunctionDef, name=id, args=args, body=stmts, decorator_list=[])
+
+    def _parse_return(self):
+        self._expect(TOK_RETURN)
+        if self._current()[0] != ';':
+            value = self._parse_expr()
+        else:
+            value = None
+        self._expect(';')
+        return self._make(ast.Return, value=value)
+
+    def _parse_if(self):
+        self._expect(TOK_IF)
+        self._expect("(")
+        expr = self._parse_expr()
+        self._expect(")")
+        self._expect("{")
+
+        stmts = []
+        while self._current()[0] != "}":
+            stmt = self._parse_stmt()
+            stmts.append(stmt)
+
+        self._expect("}")
+
+        return self._make(ast.If, test=expr, body=stmts, orelse=[])
+
+    def _parse_expr(self):
+        ttype, semval = self._current()
+
+        if ttype == TOK_IDENT:
+            self._next()
+            expr = self._make(ast.Name, id=semval, ctx=ast.Load())
+            while self._current()[0] == '.':
+                self._next()
+                attr = self._expect(TOK_IDENT)
+                expr = self._make(ast.Attribute, value=expr, attr=attr, ctx=ast.Load())
+            if self._current()[0] == '(':
+                expr = self._parse_call(expr)
+            return expr
+        elif ttype == TOK_STR:
+            value = self._expect(TOK_STR)
+            return self._make(ast.Str, s=value)
+        elif ttype == TOK_NUM:
+            value = self._expect(TOK_NUM)
+            return self._make(ast.Num, n=long(value))
+        elif ttype == TOK_TRUE:
+            self._expect(TOK_TRUE)
+            return self._make(ast.Name, id="True", ctx=ast.Load())
+        elif ttype == TOK_FALSE:
+            self._expect(TOK_FALSE)
+            return self._make(ast.Name, id="False", ctx=ast.Load())
+        elif ttype == "[":
+            return self._parse_array()
+        else:
+            self._error("unknown expression type: %s" % ttype)
+
+    def _parse_use(self):
+        self._expect(TOK_IMPORT)
+
+        id = self._expect(TOK_IDENT)
+        aliasn = self._make(ast.alias, name=id)
+        importn = self._make(ast.Import, names=[aliasn])
+        self._expect(";")
+        return importn
+
+    def _parse_call(self, expr):
+        self._expect("(")
+        args = []
+        while self._current()[0] != ")":
+            arg = self._parse_expr()
+            args.append(arg)
+            if self._current()[0] == ',': self._next()
+        self._expect(")")
+
+        calln = self._make(ast.Call, func=expr, args=args, keywords=[])
+        return calln
+
+    def _parse_array(self):
+        self._expect("[")
+        elements = []
+        while self._current()[0] != "]":
+            element = self._parse_expr()
+            elements.append(element)
+            if self._current()[0] == ',': self._next()
+        self._expect("]")
+        return self._make(ast.List, elts=elements, ctx=ast.Load())
+
+    def _error(self, message):
+        print >>sys.stderr, "error: %s" % message
+        sys.exit(1)
+
+    def _peek(self):
+        return self._tokens[self._offset+1]
+
+    def _make(self, klass, **kwargs):
+        node = klass()
+        if "lineno" in node._attributes:
+            node.lineno = 0
+        if "col_offset" in node._attributes:
+            node.col_offset = 0
+        for key, value in kwargs.iteritems():
+            setattr(node, key, value)
+        return node
+
+    def _current(self):
+        return self._tokens[self._offset]
+    
+    def _next(self):
+        cur = self._current()
+        self._offset += 1
+        return cur
+
+    def _expect(self, ttype):
+        c = self._current()
+        if c[0] != ttype:
+            self._error("expected %s, but got %s" % (ttype, c[0]))
+        else:
+            return self._next()[1]
+
+parser = OptionParser()
+parser.add_option("-c", "--compile", action="store_true", dest="compile", default=False)
+options, args = parser.parse_args()
+
+filename = args[0]
+tokens = Scanner().scan(open(filename, "r").read())
+mod = Parser().parse(tokens)
+#print ast.dump(mod)
+co = compile(mod, filename, "exec")
+
+if options.compile:
+    destfile = filename.split(".")
+    destfile.pop()
+    destfile.append("pyc")
+    destfile = ".".join(destfile)
+
+    stream = open(destfile, "w+b")
+    stream.write(imp.get_magic())
+    stream.write('\x00\x00\x00\x00')
+    stream.write(marshal.dumps(co))
+    stream.close()
+else:
+    eval(co)
+

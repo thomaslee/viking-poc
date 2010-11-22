@@ -1,0 +1,16 @@
+import gtk;
+
+def onquit(arg1, arg2) {
+    gtk.main_quit();
+}
+
+def main() {
+    window = gtk.Window();
+    window.connect("delete-event", onquit);
+    window.show_all();
+
+    gtk.main();
+}
+
+main();
+

@@ -1,0 +1,24 @@
+import sys;
+import pygame;
+
+#def print(s) {
+#    sys.stdout.write(str(s));
+#    sys.stdout.write("\n");
+#}
+
+def init() {
+    pygame.init();
+    pygame.display.set_mode([800, 600], 32);
+    return true;
+}
+
+def quit() {
+    pygame.quit();
+    return true;
+}
+
+print("init()");
+init();
+
+print("quit()");
+quit();
