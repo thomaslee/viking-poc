@@ -19,7 +19,7 @@ TOK_IF  = keyword("if")
 TOK_ELSE   = keyword("else")
 TOK_TRUE = keyword("true")
 TOK_FALSE = keyword("false")
-TOK_FN   = keyword("func")
+TOK_FN   = keyword("fn")
 TOK_RETURN = keyword("return")
 TOK_NULL   = keyword("null")
 

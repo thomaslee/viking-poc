@@ -1,12 +1,12 @@
 use pygame;
 
-func init() {
+fn init() {
     pygame.init();
     pygame.display.set_mode([800, 600], 32);
     return true;
 }
 
-func quit() {
+fn quit() {
     pygame.quit();
     return true;
 }

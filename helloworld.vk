@@ -1,4 +1,4 @@
-func hello_world() {
+fn hello_world() {
     print("Hello, World!");
 }
 
