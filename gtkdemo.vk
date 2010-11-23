@@ -4,15 +4,11 @@ func onquit(arg1, arg2) {
     gtk.main_quit();
 }
 
-func clicked(arg1) {
-    print("Test");
-}
-
 func main() {
     window = gtk.Window();
     window.connect("delete-event", onquit);
     button = gtk.Button("Hello");
-    button.connect("clicked", clicked);
+    button.connect("clicked", func(arg1) { print("test"); });
     window.add(button);
 
     window.show_all();

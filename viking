@@ -97,14 +97,19 @@ class Parser(object):
         object.__init__(self)
         self._tokens = None
         self._offset  = 0
+        self._scope_stack = []
+        self._current_scope = None
+        self._next_anon_fn_id = 0
 
     def parse(self, tokens):
         self._tokens = tokens
         mod = ast.Module()
         mod.body = []
+        self._enter_scope(mod.body)
         while self._offset < len(self._tokens):
             stmt = self._parse_stmt()
             mod.body.append(stmt)
+        self._leave_scope()
         self._tokens = None
         return mod
 
@@ -136,6 +141,12 @@ class Parser(object):
     def _parse_fn(self):
         self._expect(TOK_FN)
         id = self._expect(TOK_IDENT)
+        args = self._parse_args_decl()
+        stmts = self._parse_fn_body()
+        return self._make(ast.FunctionDef, name=id, args=args, body=stmts, decorator_list=[])
+
+
+    def _parse_args_decl(self):
         self._expect("(")
         args = []
         while self._current()[0] != ")":
@@ -145,13 +156,7 @@ class Parser(object):
             if self._current()[0] == ',': self._next()
         args = self._make(ast.arguments, args=args, defaults=[])
         self._expect(")")
-        self._expect("{")
-        stmts = []
-        while self._current()[0] != "}":
-            stmt = self._parse_stmt()
-            stmts.append(stmt)
-        self._expect("}")
-        return self._make(ast.FunctionDef, name=id, args=args, body=stmts, decorator_list=[])
+        return args
 
     def _parse_return(self):
         self._expect(TOK_RETURN)
@@ -217,6 +222,14 @@ class Parser(object):
         elif ttype == TOK_NULL:
             self._expect(TOK_NULL)
             return self._make(ast.Name, id="None", ctx=ast.Load())
+        elif ttype == TOK_FN:
+            self._expect(TOK_FN)
+            args = self._parse_args_decl()
+            stmts = self._parse_fn_body()
+            name = self._anon_fn_name()
+            fn = self._make(ast.FunctionDef, name=name, args=args, body=stmts, decorator_list=[])
+            self._current_scope.insert(0, fn)
+            return self._make(ast.Name, id=name, ctx=ast.Load())
         elif ttype == "[":
             return self._parse_array()
         else:
@@ -241,6 +254,16 @@ class Parser(object):
         self._expect(")")
         return args
 
+    def _parse_fn_body(self):
+        self._expect("{")
+        stmts = []
+        self._enter_scope(stmts)
+        while self._current()[0] != "}":
+            stmt = self._parse_stmt()
+            stmts.append(stmt)
+        self._leave_scope()
+        self._expect("}")
+        return stmts
 
     def _parse_array(self):
         self._expect("[")
@@ -251,6 +274,22 @@ class Parser(object):
             if self._current()[0] == ',': self._next()
         self._expect("]")
         return self._make(ast.List, elts=elements, ctx=ast.Load())
+
+    def _anon_fn_name(self):
+        name = "__vk_anon_" + str(self._next_anon_fn_id)
+        self._next_anon_fn_id += 1
+        return name
+
+    def _enter_scope(self, stmts):
+        self._scope_stack.append(stmts)
+        self._current_scope = stmts
+
+    def _leave_scope(self):
+        self._scope_stack.pop()
+        if self._scope_stack:
+            self._current_scope = self._scope_stack[-1]
+        else:
+            self._current_scope = None
 
     def _error(self, message):
         print >>sys.stderr, "error: %s" % message
