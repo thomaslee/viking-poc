@@ -199,7 +199,8 @@ class Parser(object):
                 attr = self._expect(TOK_IDENT)
                 expr = self._make(ast.Attribute, value=expr, attr=attr, ctx=ast.Load())
             if self._current()[0] == '(':
-                expr = self._parse_call(expr)
+                args = self._parse_args()
+                expr = self._make(ast.Call, func=expr, args=args, keywords=[])
             return expr
         elif ttype == TOK_STR:
             value = self._expect(TOK_STR)
@@ -230,7 +231,7 @@ class Parser(object):
         self._expect(";")
         return importn
 
-    def _parse_call(self, expr):
+    def _parse_args(self):
         self._expect("(")
         args = []
         while self._current()[0] != ")":
@@ -238,9 +239,8 @@ class Parser(object):
             args.append(arg)
             if self._current()[0] == ',': self._next()
         self._expect(")")
+        return args
 
-        calln = self._make(ast.Call, func=expr, args=args, keywords=[])
-        return calln
 
     def _parse_array(self):
         self._expect("[")
