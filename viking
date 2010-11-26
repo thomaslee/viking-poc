@@ -14,12 +14,12 @@ _KEYWORDS = []
 def keyword(s):
     _KEYWORDS.append(s)
     return s
-TOK_USE = keyword("use")
+TOK_IMPORT = keyword("import")
 TOK_IF  = keyword("if")
 TOK_ELSE   = keyword("else")
 TOK_TRUE = keyword("true")
 TOK_FALSE = keyword("false")
-TOK_FN   = keyword("fn")
+TOK_DEF   = keyword("def")
 TOK_RETURN = keyword("return")
 TOK_NULL   = keyword("null")
 
@@ -116,7 +116,7 @@ class Parser(object):
     def _parse_stmt(self):
         ttype, semval = self._current()
 
-        if ttype == TOK_USE:
+        if ttype == TOK_IMPORT:
             return self._parse_use()
         elif ttype == TOK_IF:
             return self._parse_if()
@@ -131,7 +131,7 @@ class Parser(object):
             else:
                 self._expect(';')
                 return self._make(ast.Expr, value=expr)
-        elif ttype == TOK_FN:
+        elif ttype == TOK_DEF:
             return self._parse_fn()
         elif ttype == TOK_RETURN:
             return self._parse_return()
@@ -139,7 +139,7 @@ class Parser(object):
             self._error("unexpected token: %s" % ttype)
 
     def _parse_fn(self):
-        self._expect(TOK_FN)
+        self._expect(TOK_DEF)
         id = self._expect(TOK_IDENT)
         args = self._parse_args_decl()
         stmts = self._parse_fn_body()
@@ -222,8 +222,8 @@ class Parser(object):
         elif ttype == TOK_NULL:
             self._expect(TOK_NULL)
             return self._make(ast.Name, id="None", ctx=ast.Load())
-        elif ttype == TOK_FN:
-            self._expect(TOK_FN)
+        elif ttype == TOK_DEF:
+            self._expect(TOK_DEF)
             args = self._parse_args_decl()
             stmts = self._parse_fn_body()
             name = self._anon_fn_name()
@@ -236,7 +236,7 @@ class Parser(object):
             self._error("unknown expression type: %s" % ttype)
 
     def _parse_use(self):
-        self._expect(TOK_USE)
+        self._expect(TOK_IMPORT)
 
         id = self._expect(TOK_IDENT)
         aliasn = self._make(ast.alias, name=id)
@@ -304,7 +304,7 @@ class Parser(object):
             node.lineno = 0
         if "col_offset" in node._attributes:
             node.col_offset = 0
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(node, key, value)
         return node
 

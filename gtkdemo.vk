@@ -1,14 +1,14 @@
-use gtk;
+import gtk;
 
-fn onquit(arg1, arg2) {
+def onquit(arg1, arg2) {
     gtk.main_quit();
 }
 
-fn main() {
+def main() {
     window = gtk.Window();
     window.connect("delete-event", onquit);
     button = gtk.Button("Hello");
-    button.connect("clicked", fn(arg1) { print("test"); });
+    button.connect("clicked", def(arg1) { print("test"); });
     window.add(button);
 
     window.show_all();

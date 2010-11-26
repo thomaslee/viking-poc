@@ -1,12 +1,12 @@
-use pygame;
+import pygame;
 
-fn init() {
+def init() {
     pygame.init();
     pygame.display.set_mode([800, 600], 32);
     return true;
 }
 
-fn quit() {
+def quit() {
     pygame.quit();
     return true;
 }
